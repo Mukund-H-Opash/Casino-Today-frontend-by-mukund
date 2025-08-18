@@ -1,0 +1,29 @@
+SOCKET EVENT: bonusTypeDeleted 
+{_id: '68a2d99ba4653b5ac665333f', name: 'canada', createdAt: '2025-08-18T07:43:23.713Z', updatedAt: '2025-08-18T07:43:23.713Z', __v: 0, …}
+bonusTypeName
+: 
+"canada"
+count
+: 
+"Not in use"
+createdAt
+: 
+"2025-08-18T07:43:23.713Z"
+id
+: 
+"68a2d99ba4653b5ac665333f"
+name
+: 
+"canada"
+updatedAt
+: 
+"2025-08-18T07:43:23.713Z"
+__v
+: 
+0
+_id
+: 
+"68a2d99ba4653b5ac665333f"
+[[Prototype]]
+: 
+Object

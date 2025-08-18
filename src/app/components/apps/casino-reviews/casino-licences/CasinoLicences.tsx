@@ -1,0 +1,296 @@
+'use client';
+import React, { useEffect, useState, ChangeEvent, MouseEvent } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  Box,
+  Button,
+  Collapse,
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+  useTheme,
+  CircularProgress,
+  TableContainer,
+  Paper,
+  InputAdornment,
+  TablePagination,
+} from '@mui/material';
+import { IconPlus, IconEdit, IconTrash, IconSearch } from '@tabler/icons-react';
+import { AppDispatch, RootState } from '@/store/store';
+import {
+  fetchCasinoLicences,
+  createCasinoLicence,
+  updateCasinoLicence,
+  deleteCasinoLicence,
+} from '@/store/apps/casinoReview/CasinoLicencesSlice';
+import BlankCard from '@/app/components/shared/BlankCard';
+import CustomTextField from '@/app/components/forms/theme-elements/CustomTextField';
+import socket from '@/utils/socket';
+import { addLicence, updateLicenceInList, removeLicenceFromList } from '@/store/apps/casinoReview/CasinoLicencesSlice';
+
+const headCells = [
+  {
+    id: 'licenceName',
+    numeric: false,
+    disablePadding: false,
+    label: 'LICENCE NAME',
+  },
+  {
+    id: 'count',
+    numeric: false,
+    disablePadding: false,
+    label: 'NUMBER OF USES',
+  },
+  {
+    id: 'action',
+    numeric: false,
+    disablePadding: false,
+    label: 'ACTION',
+  },
+];
+
+interface EnhancedTableToolbarProps {
+  handleSearch: (event: ChangeEvent<HTMLInputElement>) => void;
+  search: string;
+  setShowCreateForm: React.Dispatch<React.SetStateAction<boolean>>;
+  showCreateForm: boolean;
+}
+
+const EnhancedTableToolbar = ({ handleSearch, search, setShowCreateForm, showCreateForm }: EnhancedTableToolbarProps) => {
+  return (
+    <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <TextField
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <IconSearch size="1.1rem" />
+            </InputAdornment>
+          ),
+        }}
+        placeholder="Search Licences"
+        size="small"
+        onChange={handleSearch}
+        value={search}
+      />
+      <Button
+        variant="contained"
+        color="primary"
+        startIcon={<IconPlus />}
+        onClick={() => setShowCreateForm(!showCreateForm)}
+      >
+        Add New Licence
+      </Button>
+    </Box>
+  );
+};
+
+const CasinoLicences = () => {
+  const dispatch = useDispatch<AppDispatch>();
+  const { licences, isLoading } = useSelector((state: RootState) => state.casinoLicences);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newLicenceName, setNewLicenceName] = useState('');
+  const [editingLicence, setEditingLicence] = useState<any>(null);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
+
+  const theme = useTheme();
+  const primaryLight = theme.palette.primary.light;
+  const borderColor = theme.palette.divider;
+
+  useEffect(() => {
+    dispatch(fetchCasinoLicences());
+  }, [dispatch]);
+  useEffect(() => {
+    const handleLicenceCreated = (newLicence: any) => {
+      dispatch(addLicence(newLicence));
+    };
+    const handleLicenceUpdated = (updatedLicence: any) => {
+      dispatch(updateLicenceInList(updatedLicence));
+    };
+    const handleLicenceDeleted = (licenceId: string) => {
+      dispatch(removeLicenceFromList(licenceId));
+    };
+    socket.on('licenceCreated', handleLicenceCreated);
+    socket.on('licenceUpdated', handleLicenceUpdated);
+    socket.on('licenceDeleted', handleLicenceDeleted);
+
+    return () => {
+      socket.off('licenceCreated', handleLicenceCreated);
+      socket.off('licenceUpdated', handleLicenceUpdated);
+      socket.off('licenceDeleted', handleLicenceDeleted);
+    };
+  }, [dispatch]);
+
+
+  const handleCreate = async () => {
+    if (newLicenceName.trim() === '') {
+      return;
+    }
+    await dispatch(createCasinoLicence(newLicenceName));
+    setNewLicenceName('');
+    setShowCreateForm(false);
+    dispatch(fetchCasinoLicences());
+  };
+
+  const handleUpdate = async () => {
+    if (editingLicence && (typeof editingLicence.licenceName !== 'string' || editingLicence.licenceName.trim() === '')) {
+      return;
+    }
+    if (editingLicence) {
+      await dispatch(updateCasinoLicence({ id: editingLicence._id, name: editingLicence.licenceName }));
+      setEditingLicence(null);
+      dispatch(fetchCasinoLicences());
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    await dispatch(deleteCasinoLicence(id));
+    dispatch(fetchCasinoLicences());
+  };
+
+  const handleSearch = (event: ChangeEvent<HTMLInputElement>) => {
+    setSearch(event.target.value);
+  };
+
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  const sortedLicences = [...licences].sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+  const filteredLicences = sortedLicences.filter((licence: any) =>
+    licence.licenceName && licence.licenceName.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const emptyRows = page > 0 ? Math.max(0, (1 + page) * rowsPerPage - filteredLicences.length) : 0;
+
+  return (
+    <BlankCard>
+      <Box sx={{ p: 2, borderBottom: '1px solid rgba(0, 0, 0, 0.12)', borderRadius: '4px', bgcolor: primaryLight }}>
+        <Typography variant="h6" fontWeight={600}>
+          Casino Licences
+        </Typography>
+      </Box>
+      <EnhancedTableToolbar
+        search={search}
+        handleSearch={handleSearch}
+        setShowCreateForm={setShowCreateForm}
+        showCreateForm={showCreateForm}
+      />
+      <Box sx={{ p: 2 }}>
+        <Collapse in={showCreateForm}>
+          <Paper variant="outlined" sx={{ mb: 3, border: `1px solid ${borderColor}` }}>
+            <Box sx={{ p: 3 }}>
+              <CustomTextField
+                label="New Licence Name"
+                variant="outlined"
+                value={newLicenceName}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setNewLicenceName(e.target.value)}
+                fullWidth
+                sx={{ mb: 2 }}
+              />
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button variant="contained" color="primary" onClick={handleCreate}>Save</Button>
+                <Button variant="outlined" color="error" onClick={() => setShowCreateForm(false)}>Cancel</Button>
+              </Box>
+            </Box>
+          </Paper>
+        </Collapse>
+        {isLoading ? (
+          <Box sx={{ textAlign: 'center', p: 4 }}>
+            <CircularProgress />
+            <Typography>Loading Licences...</Typography>
+          </Box>
+        ) : (
+          <TableContainer>
+            <Table aria-label="casino licences table" sx={{ whiteSpace: 'nowrap' }}>
+              <TableHead>
+                <TableRow sx={{ bgcolor: primaryLight, borderRadius: '8px' }}>
+                  {headCells.map((headCell) => (
+                    <TableCell
+                      key={headCell.id}
+                      align={headCell.numeric ? 'right' : 'left'}
+                      padding="normal"
+                    >
+                      <Typography variant="body2" fontWeight={600} color="text.secondary">
+                        {headCell.label}
+                      </Typography>
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredLicences.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((licence: any) => (
+                  <TableRow hover key={licence._id}>
+                    <TableCell sx={{ py: 1, px: 2 }}>
+                      {editingLicence && editingLicence._id === licence._id ? (
+                        <CustomTextField
+                          value={editingLicence.licenceName}
+                          onChange={(e: ChangeEvent<HTMLInputElement>) => setEditingLicence({ ...editingLicence, licenceName: e.target.value })}
+                          fullWidth
+                        />
+                      ) : (
+                        <Typography variant="subtitle1" fontWeight={600}>
+                          {licence.licenceName}
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell sx={{ py: 1, px: 2 }}>
+                      <Typography variant="subtitle2" color="textSecondary">
+                        {licence.count <1 ? 'Not in use ' : licence.count}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ py: 1, px: 2 }}>
+                      {editingLicence && editingLicence._id === licence._id ? (
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button variant="contained" color="primary" onClick={handleUpdate} size="small">Save</Button>
+                          <Button variant="outlined" color="error" onClick={() => setEditingLicence(null)} size="small">Cancel</Button>
+                        </Box>
+                      ) : (
+                        <Box>
+                          <IconButton onClick={() => setEditingLicence({ ...licence })} size="small">
+                            <IconEdit width={18} />
+                          </IconButton>
+                          <IconButton onClick={() => handleDelete(licence._id)} size="small">
+                            <IconTrash width={18} />
+                          </IconButton>
+                        </Box>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {emptyRows > 0 && (
+                  <TableRow style={{ height: 53 * emptyRows }}>
+                    <TableCell colSpan={3} />
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+        <TablePagination
+          rowsPerPageOptions={[5, 10, 25]}
+          component="div"
+          count={filteredLicences.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
+      </Box>
+    </BlankCard>
+  );
+};
+
+export default CasinoLicences;
